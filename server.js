@@ -37,3 +37,5 @@ app.get('/ai', async (req,res)=> {
 app.listen(PORT, () => {
     console.log(`Listening to PORT: ${PORT}`)
 })
+
+// Reconnection!!!
