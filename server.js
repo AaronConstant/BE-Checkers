@@ -1,9 +1,11 @@
 import Anthropic from '@anthropic-ai/sdk' 
 import  express from 'express'
+import cors from    'cors'  
 
 
 const app = express()
-
+app.use(express.json())
+app.use(cors())
 import "dotenv/config.js";
 
 
@@ -38,28 +40,36 @@ const anthropic = new Anthropic({
   apiKey: `${API_KEY}`,
 });
 
-app.get('/',async (req,res)=> {
-    const updatedBoard = []
+app.post('/bestmove', async (req, res) => {
+    const {board, playerColor} = req.body
     
-    const msg = await anthropic.messages.create({
-        model: "claude-3-5-sonnet-20241022",
-        max_tokens: 1000,
-        temperature: 0,
-        messages: [
-        {
-            "role": "user",
-            "content": [
-            {
-                "type": "text",
-                "text": "You are an AI assistant tasked with recommending the best move in a game of checkers. You will be given the current board state, your player color, and the opponent's recent moves. Your goal is to analyze the situation and suggest the most strategic move.\n\nFirst, here is the current board state:\n<board_state>\n{{BOARD_STATE}}\n</board_state>\n\nYou are playing as the {{PLAYER_COLOR}} pieces.\n\nThe opponent's recent moves have been:\n<opponent_moves>\n{{OPPONENT_MOVES}}\n</opponent_moves>\n\nBefore making your recommendation, please keep in mind the following rules and objectives of checkers:\n1. Regular pieces can only move diagonally forward.\n2. Kings can move diagonally both forward and backward.\n3. Captures are mandatory if available.\n4. Multiple captures in a single turn are allowed and mandatory if possible.\n5. The goal is to capture all of the opponent's pieces or block them so they cannot move.\n\nNow, please analyze the board state carefully. Consider the following:\n1. Available moves for your pieces\n2. Potential captures\n3. Defensive positions to protect your pieces\n4. Opportunities to create kings\n5. The opponent's possible counter-moves\n\nAfter your analysis, provide your reasoning for the best move in a <reasoning> tag. Include why you believe this move is the most strategic option, considering both offensive and defensive aspects.\n\nFinally, recommend the best move in a <move> tag. Use standard checkers notation to describe the move (e.g., \"11-15\" for moving a piece from square 11 to square 15).\n\nRemember to consider all possible moves and their potential consequences before making your final recommendation."
-            }
-            ]
-        }
-        ]
-    });
+    if (!board || !playerColor) {
+        return res.status(400).json({ error: 'Missing required board or playerColor in request body' })
+    }
 
-    res.send(updatedBoard.push(msg[0].text))
-    console.log(updatedBoard);
+    try {
+        const msg = await anthropic.messages.create({
+            model: "claude-3-5-sonnet-20241022",
+            max_tokens: 1000,
+            temperature: 0,
+            messages: [
+                {
+                    "role": "user", 
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": `You are an AI checkers moving assistant. Your task is to analyze the given board and determine the best move for the specified player color. Do not provide any explanation or reasoning for your move. Simply output the position you are moving from and the position you are moving to in chess notation.The current board state is represented as follows:<board>{${board}}</board>The color of the player to move is<player_color>{${playerColor}}</player_color>Analyze the board and determine the best move for the specified player color. Then, provide your move in the following format<move[starting position] [ending position</moveFor example, if you want to move a piece from e3 to d4, your output should look like this e3 d4 Remember, do not provide any explanation or additional information. Only output the move within the specified tags.`           
+                        }
+                    ]
+                }
+            ]
+        });
+
+        res.json(msg.content[0].text);
+    } catch (error) {
+        console.error('Error processing move:', error);
+        res.status(500).json({ error: 'Failed to process move request' });
+    }
 })
 
 app.listen(PORT, () => {
